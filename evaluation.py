@@ -81,10 +81,10 @@ class EvaluationExperiments(object):
 
     def ablation_experiment(self,  data, explanation_type,  save_path_ablation, do_attention=False):
         '''
-        words ablation:For words with index larger than 5, we first explain the target word and delete the top-3 relevant words
+        words ablation:For words with index larger than 6, we first explain the target word and delete the top-3 relevant words
         For each word we delete the top-k relevant image patches
-        image ablation: For words with index larger than 1 and in the category list, we explain the target word and set the top 200 relevant pixel
-        as the mean, and generate a new sentence. we check whether the target is within the new sentence. if the target word is still predicted after ablation,
+        image ablation: For words with index larger than 1 and in the category list, we explain the target word and set the top 20 relevant patches
+        as the mean, and generate a new sentence. we check whether the target word is within the new sentence. if the target word is still predicted after ablation,
         we calculate the softmax predicted score to see if the model is less confident to generate the target word.
         :return:
         '''
