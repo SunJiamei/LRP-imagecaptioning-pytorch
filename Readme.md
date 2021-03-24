@@ -10,7 +10,7 @@ This is a Pytorch implementation of the latest version of [Understanding Image C
 
 ### Requirements
 python >=3.6 
-pytorch >=1.4.0
+pytorch =1.4.0
 
 ### Dataset Preparation
 ##### Flickr30K
