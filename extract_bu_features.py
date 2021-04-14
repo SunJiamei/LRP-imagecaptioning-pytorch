@@ -124,7 +124,7 @@ def extract_featrue(predictor, split, dataset_name, data, th=0.2):
             attr_prob = pred_attr_logits[..., :-1].softmax(-1)
             max_attr_prob, max_attr_label = attr_prob.max(-1)
 
-            # Note: 
+            # Note:
             #       we use the predicted boxes instead.
             # boxes = proposal_boxes[0].tensor
 

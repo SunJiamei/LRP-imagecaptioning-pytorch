@@ -448,6 +448,7 @@ class EvaluationExperiments(object):
         torch.cuda.empty_cache()
 
     def tpfp_experiment(self,data, explanation_type,  save_path_tpfp, frequent_list, do_attention):
+        quantile_point = [i/100 for i in range(0, 100)]
         self.TP_statistics = []
         self.FP_statistics = []
         self.TP_statistics_beta = []
@@ -489,16 +490,30 @@ class EvaluationExperiments(object):
                         attention = attention.reshape(attention_size, attention_size)
                         attention = skimage.transform.pyramid_expand(attention, upscale=scale,
                                                                      multichannel=False)
-                    relevance_img_tp = np.mean(relevance_img_tp,axis=(0,1))  #(H, W)
+                        attention_quantile = np.quantile(attention,quantile_point)
+                        attention_quantile_list = [str(item) for item in attention_quantile]
+                    # print(relevance_img_tp.shape)
+                    if explanation_type == 'GradCam':
+                        gradcam_size = int(np.sqrt(relevance_img_tp.shape[1]))
+                        scale = int(self.explainer.args.height // gradcam_size)
+                        relevance_img_tp = relevance_img_tp.squeeze().reshape(gradcam_size, gradcam_size)
+                        relevance_img_tp = skimage.transform.pyramid_expand(relevance_img_tp, upscale=scale,
+                                                                     multichannel=False)
+                    else:
+                        relevance_img_tp = np.mean(relevance_img_tp,axis=(0,1))  #(H, W)
+
+
                     if np.sum(relevance_img_tp>0) == 0:
                         mean_pos = 0
                     else:
                         mean_pos = np.sum(np.maximum(relevance_img_tp,0))/ np.sum(relevance_img_tp>0)
-                    self.TP_statistics.append({'word':word_str, 'mean': str(np.mean(relevance_img_tp)), 'mean_abs': str(np.mean(np.abs(relevance_img_tp))),
-                                               'mean_pos': str(mean_pos), 'max': str(np.max(relevance_img_tp))})
-                    self.TP_statistics_beta.append({'word':word_str, '1-beta': str(1-self.explainer.betas[t].detach().cpu().item())})
+                    quantile = np.quantile(relevance_img_tp, quantile_point)
+                    quantile_list = [str(item) for item in quantile]
+                    self.TP_statistics.append({'word':word_str,'mean': str(np.mean(relevance_img_tp)), 'mean_abs': str(np.mean(np.abs(relevance_img_tp))),
+                                               'mean_pos': str(mean_pos), 'max': str(np.max(relevance_img_tp)), 'quantile': quantile_list})
+                    self.TP_statistics_beta.append({'word':word_str,'1-beta': str(1-self.explainer.betas[t].detach().cpu().item())})
                     if do_attention:
-                        self.TP_statistics_att.append({'word':word_str, 'mean': str(np.mean(attention)), 'max': str(np.max(attention))})
+                        self.TP_statistics_att.append({'word':word_str,'mean': str(np.mean(attention)), 'max': str(np.max(attention)), 'quantile':attention_quantile_list})
                 elif word_str in frequent_list and word_t not in ref_vocab:
                     relevance_img_fp = relevance_imgs[t].detach().clone().cpu().numpy()
                     if do_attention:
@@ -511,16 +526,27 @@ class EvaluationExperiments(object):
                         attention = attention.reshape(attention_size, attention_size)
                         attention = skimage.transform.pyramid_expand(attention, upscale=scale,
                                                                      multichannel=False)
-                    relevance_img_fp = np.mean(relevance_img_fp,axis=(0,1))  #(H, W)
+                        attention_quantile = np.quantile(attention, quantile_point)
+                        attention_quantile_list = [str(item) for item in attention_quantile]
+                    if explanation_type == 'GradCam':
+                        gradcam_size = int(np.sqrt(relevance_img_fp.shape[1]))
+                        scale = int(self.explainer.args.height // gradcam_size)
+                        relevance_img_fp = relevance_img_fp.squeeze().reshape(gradcam_size, gradcam_size)
+                        relevance_img_fp = skimage.transform.pyramid_expand(relevance_img_fp, upscale=scale,
+                                                                            multichannel=False)
+                    else:
+                        relevance_img_fp = np.mean(relevance_img_fp, axis=(0, 1))  # (H, W)
                     if np.sum(relevance_img_fp>0) == 0:
                         mean_pos = 0
                     else:
                         mean_pos = np.sum(np.maximum(relevance_img_fp,0))/ np.sum(relevance_img_fp>0)
-                    self.FP_statistics.append({'word':word_str, 'mean': str(np.mean(relevance_img_fp)), 'mean_abs': str(np.mean(np.abs(relevance_img_fp))),
-                                               'mean_pos': str(mean_pos), 'max': str(np.max(relevance_img_fp))})
-                    self.FP_statistics_beta.append({'word':word_str, '1-beta': str(1-self.explainer.betas[t].detach().cpu().item())})
+                    quantile = np.quantile(relevance_img_fp, quantile_point)
+                    quantile_list = [str(item) for item in quantile]
+                    self.FP_statistics.append({'word':word_str,'mean': str(np.mean(relevance_img_fp)), 'mean_abs': str(np.mean(np.abs(relevance_img_fp))),
+                                               'mean_pos': str(mean_pos), 'max': str(np.max(relevance_img_fp)), 'quantile': quantile_list})
+                    self.FP_statistics_beta.append({'word':word_str,'1-beta': str(1-self.explainer.betas[t].detach().cpu().item())})
                     if do_attention:
-                        self.FP_statistics_att.append({'word':word_str, 'mean': str(np.mean(attention)), 'max': str(np.max(attention))})
+                        self.FP_statistics_att.append({'word':word_str,'mean': str(np.mean(attention)), 'max': str(np.max(attention)),'quantile':attention_quantile_list})
             new_predicted_scores_random = self.explainer.teacherforce_forward(self.explainer.img.detach().clone(),
                                                                           beam_caption_encoded)
         print(self.FP_statistics)
@@ -1132,19 +1158,28 @@ def analyze_TPFP_20(model_type):
     results_tp = {}
     results_fp = {}
     for i, explanation_type in enumerate(explanation_type):
+        print(explanation_type)
         tp = {}
         fp = {}
+
         # print(explanation_type)
+        tp_count = 0
+        fp_count = 0
+        quantile_list = [i / 100 for i in range(0, 51)]
         path_ablation = os.path.join(args.save_path, args.encoder, 'flickr30k', 'evaluation/tpfp/', explanation_type)
         if explanation_type in ['attention']:
-            files_tp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp/lrp/',
+            files_tp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/lrp/',
                                            '*' + explanation_type + '_TP_statistics.json'))
-            files_fp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp/lrp/',
+            files_fp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/lrp/',
                                               '*' + explanation_type + '_FP_statistics.json'))
-            tp['mean'] = []
-            fp['mean'] = []
-            tp['max'] = []
-            fp['max'] = []
+
+            tp[explanation_type + 'mean'] = []
+            tp[explanation_type + 'max'] = []
+            fp[explanation_type + 'mean'] = []
+            fp[explanation_type + 'max'] = []
+            for i in range(len(quantile_list)):
+                tp[explanation_type + 'quantile' + str(quantile_list[i])] = []
+                fp[explanation_type + 'quantile' + str(quantile_list[i])] = []
             for file in files_tp:
                 data = json.load(open(file, 'r'))
                 if data == []:
@@ -1154,6 +1189,9 @@ def analyze_TPFP_20(model_type):
                     word = item['word']
                     if word not in statistics.keys():
                         statistics[word] = {'mean': float('-inf'), 'max': float('-inf')}
+                        for i in range(len(quantile_list)):
+                            statistics[word]['quantile'+str(quantile_list[i])] = float('-inf')
+                        tp_count+=1
                     if item['mean'] == "nan":
                         continue
                     else:
@@ -1162,9 +1200,13 @@ def analyze_TPFP_20(model_type):
                         continue
                     else:
                         statistics[word]['max'] = np.maximum(statistics[word]['max'],float(item['max']))
+                    for i in range(len(quantile_list)):
+                        statistics[word]['quantile' + str(quantile_list[i])] = np.maximum(statistics[word]['quantile'+str(quantile_list[i])], float(item['quantile'][i]))
                 for key in statistics.keys():
-                    tp['mean'].append(statistics[key]['mean'])
-                    tp['max'].append(statistics[key]['max'])
+                    tp[explanation_type+'mean'].append(statistics[key]['mean'])
+                    tp[explanation_type+'max'].append(statistics[key]['max'])
+                    for i in range(len(quantile_list)):
+                        tp[explanation_type+'quantile'+str(quantile_list[i])].append(statistics[word]['quantile' + str(quantile_list[i])])
             for file in files_fp:
                 data = json.load(open(file, 'r'))
                 if data == []:
@@ -1174,6 +1216,9 @@ def analyze_TPFP_20(model_type):
                     word = item['word']
                     if word not in statistics.keys():
                         statistics[word] = {'mean': float('inf'), 'max': float('inf')}
+                        for i in range(len(quantile_list)):
+                            statistics[word]['quantile'+str(quantile_list[i])] = float('inf')
+                        fp_count += 1
                     if item['mean'] == "nan":
                         continue
                     else:
@@ -1182,20 +1227,27 @@ def analyze_TPFP_20(model_type):
                         continue
                     else:
                         statistics[word]['max'] = np.minimum(statistics[word]['max'],float(item['max']))
+                    for i in range(len(quantile_list)):
+                        statistics[word]['quantile' + str(quantile_list[i])] = np.minimum(statistics[word]['quantile'+str(quantile_list[i])], float(item['quantile'][i]))
                 for key in statistics.keys():
-                    fp['mean'].append(statistics[key]['mean'])
-                    fp['max'].append(statistics[key]['max'])
-            results_tp['attention_mean'] = tp['mean']
-            results_fp['attention_mean'] = fp['mean']
-            results_tp['attention_max'] = tp['max']
-            results_fp['attention_max'] = fp['max']
+                    fp[explanation_type+'mean'].append(statistics[key]['mean'])
+                    fp[explanation_type+'max'].append(statistics[key]['max'])
+                    for i in range(len(quantile_list)):
+                        fp[explanation_type+'quantile' + str(quantile_list[i])].append(
+                            statistics[word]['quantile' + str(quantile_list[i])])
+            for key in tp.keys():
+                results_tp[key]=tp[key]
+                results_fp[key] = fp[key]
         elif explanation_type == 'beta':
-            files_tp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-non-proj/lrp/',
+            files_tp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/lrp/',
                                            '*' + explanation_type + '_TP_statistics.json'))
-            files_fp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-non-proj/lrp/',
+            files_fp = glob.glob(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/lrp/',
                                               '*' + explanation_type + '_FP_statistics.json'))
+
+
             tp['1-beta'] = []
             fp['1-beta'] = []
+
             for file in files_tp:
                 data = json.load(open(file, 'r'))
                 if data == []:
@@ -1205,6 +1257,7 @@ def analyze_TPFP_20(model_type):
                     word = item['word']
                     if word not in statistics.keys():
                         statistics[word] = {'1-beta': float('-inf')}
+                        tp_count += 1
                     if item['1-beta'] == 'nan':
                         continue
                     else:
@@ -1220,25 +1273,34 @@ def analyze_TPFP_20(model_type):
                     word = item['word']
                     if word not in statistics.keys():
                         statistics[word] = {'1-beta': float('inf')}
+                        fp_count += 1
                     if item['1-beta'] == 'nan':
                         continue
                     else:
                         statistics[word]['1-beta'] = np.minimum(float(item['1-beta']), statistics[word]['1-beta'])
                 for key in statistics.keys():
                     fp['1-beta'].append(statistics[key]['1-beta'])
-            results_tp['1-beta'] = tp['1-beta']
-            results_fp['1-beta'] = fp['1-beta']
+            for key in tp.keys():
+                results_tp[key] = tp[key]
+                results_fp[key] = fp[key]
         else:
             files_tp = glob.glob(os.path.join(path_ablation,'*' + explanation_type + '_TP_statistics.json'))
             files_fp = glob.glob(os.path.join(path_ablation,'*' + explanation_type + '_FP_statistics.json'))
-            tp['mean'] = []
-            fp['mean'] = []
-            tp['mean_pos'] = []
-            fp['mean_pos'] = []
-            tp['mean_abs'] = []
-            fp['mean_abs'] = []
-            tp['max'] = []
-            fp['max'] = []
+            if explanation_type == 'lrp':
+                files_tp = glob.glob(
+                    os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/lrp/',
+                                 '*' + explanation_type + '_TP_statistics.json'))
+                files_fp = glob.glob(
+                    os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/lrp/',
+                                 '*' + explanation_type + '_FP_statistics.json'))
+
+            for s in ['mean', 'mean_pos', 'max','mean_abs']:
+                tp[explanation_type + s] = []
+                fp[explanation_type + s] = []
+            for i in range(len(quantile_list)):
+                tp[explanation_type + 'quantile' + str(quantile_list[i])]=[]
+                fp[explanation_type + 'quantile' + str(quantile_list[i])]=[]
+
             for file in files_tp:
                 data = json.load(open(file, 'r'))
                 if data == []:
@@ -1247,7 +1309,10 @@ def analyze_TPFP_20(model_type):
                 for item in data:
                     word = item['word']
                     if word not in statistics.keys():
+                        tp_count += 1
                         statistics[word] = {'mean': float('-inf'), 'mean_pos': float('-inf'), 'mean_abs': float('-inf'), 'max': float('-inf')}
+                        for i in range(len(quantile_list)):
+                            statistics[word]['quantile'+str(quantile_list[i])] = float('-inf')
                     if item['mean'] == 'nan':
                         continue
                     else:
@@ -1264,11 +1329,15 @@ def analyze_TPFP_20(model_type):
                         continue
                     else:
                         statistics[word]['mean_abs'] = np.maximum(statistics[word]['mean_abs'],float(item['mean_abs']))
+                    for i in range(len(quantile_list)):
+                        statistics[word]['quantile' + str(quantile_list[i])] = np.maximum(statistics[word]['quantile'+str(quantile_list[i])], float(item['quantile'][i]))
                 for key in statistics.keys():
-                    tp['mean'].append(statistics[key]['mean'])
-                    tp['max'].append(statistics[key]['max'])
-                    tp['mean_pos'].append(statistics[key]['mean_pos'])
-                    tp['mean_abs'].append(statistics[key]['mean_abs'])
+                    tp[explanation_type+'mean'].append(statistics[key]['mean'])
+                    tp[explanation_type+'max'].append(statistics[key]['max'])
+                    tp[explanation_type+'mean_pos'].append(statistics[key]['mean_pos'])
+                    tp[explanation_type+'mean_abs'].append(statistics[key]['mean_abs'])
+                    for i in range(len(quantile_list)):
+                        tp[explanation_type+'quantile'+str(quantile_list[i])].append(statistics[word]['quantile' + str(quantile_list[i])])
             for file in files_fp:
                 data = json.load(open(file, 'r'))
                 if data == []:
@@ -1278,6 +1347,8 @@ def analyze_TPFP_20(model_type):
                     word = item['word']
                     if word not in statistics.keys():
                         statistics[word] = {'mean': float('inf'), 'mean_pos': float('inf'), 'mean_abs': float('inf'), 'max': float('inf')}
+                        for i in range(len(quantile_list)):
+                            statistics[word]['quantile'+str(quantile_list[i])] = float('inf')
                     if item['mean'] == 'nan':
                         continue
                     else:
@@ -1294,19 +1365,27 @@ def analyze_TPFP_20(model_type):
                         continue
                     else:
                         statistics[word]['mean_abs'] = np.minimum(statistics[word]['mean_abs'],float(item['mean_abs']))
+                    for i in range(len(quantile_list)):
+                        statistics[word]['quantile' + str(quantile_list[i])] = np.minimum(statistics[word]['quantile'+str(quantile_list[i])], float(item['quantile'][i]))
                 for key in statistics.keys():
-                    fp['mean'].append(statistics[key]['mean'])
-                    fp['max'].append(statistics[key]['max'])
-                    fp['mean_pos'].append(statistics[key]['mean_pos'])
-                    fp['mean_abs'].append(statistics[key]['mean_abs'])
-            results_tp[explanation_type+'mean'] = tp['mean']
-            results_fp[explanation_type+'mean'] = fp['mean']
-            results_tp[explanation_type+'max'] = tp['max']
-            results_fp[explanation_type+'max'] = fp['max']
-            results_tp[explanation_type+'mean_pos'] = tp['mean_pos']
-            results_fp[explanation_type+'mean_pos'] = fp['mean_pos']
-            results_tp[explanation_type+'mean_abs'] = tp['mean_abs']
-            results_fp[explanation_type+'mean_abs'] = fp['mean_abs']
+
+                    fp[explanation_type+'mean'].append(statistics[key]['mean'])
+                    fp[explanation_type+'max'].append(statistics[key]['max'])
+                    fp[explanation_type+'mean_pos'].append(statistics[key]['mean_pos'])
+                    fp[explanation_type+'mean_abs'].append(statistics[key]['mean_abs'])
+                    for i in range(len(quantile_list)):
+                        fp[explanation_type+'quantile'+str(quantile_list[i])].append(statistics[word]['quantile' + str(quantile_list[i])])
+            for key in tp.keys():
+                results_tp[key] = tp[key]
+                results_fp[key] = fp[key]
+            # results_tp[explanation_type+'mean'] = tp['mean']
+            # results_fp[explanation_type+'mean'] = fp['mean']
+            # results_tp[explanation_type+'max'] = tp['max']
+            # results_fp[explanation_type+'max'] = fp['max']
+            # results_tp[explanation_type+'mean_pos'] = tp['mean_pos']
+            # results_fp[explanation_type+'mean_pos'] = fp['mean_pos']
+            # results_tp[explanation_type+'mean_abs'] = tp['mean_abs']
+            # results_fp[explanation_type+'mean_abs'] = fp['mean_abs']
     auc_score = {}
     for key in results_fp.keys():
         print(key, len(results_fp[key]), len(results_tp[key]))
@@ -1317,7 +1396,7 @@ def analyze_TPFP_20(model_type):
         roc_auc = auc(fpr, tpr)
         auc_score[key] = str(roc_auc)
         print(key, roc_auc)
-    with open(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-non-proj/', 'auc.json'),'w') as f:
+    with open(os.path.join(args.save_path, args.encoder, 'flickr30k/evaluation/tpfp-beam1/', 'full_auc.json'),'w') as f:
         json.dump(auc_score, f)
 
 
@@ -1331,15 +1410,17 @@ def observe_frequent_words(predicted_file,th):
         for w in words:
             if w not in vocab.keys():
                 vocab[w] = 0
-            else:
-                vocab[w] += 1
+            vocab[w] += 1
     sorted_vocab = {k: v for k, v in sorted(vocab.items(), key=lambda item: item[1])}
+    # for key in sorted_vocab:
+    #     if key not in STOP_WORDS:
+    #         if sorted_vocab[key] > th:
+    #             print(key, sorted_vocab[key])
+    #             f_list.append(key)
+    # print(f_list)
     for key in sorted_vocab:
-        if key not in STOP_WORDS:
-            if sorted_vocab[key] > th:
-                print(key, sorted_vocab[key])
-                f_list.append(key)
-    print(f_list)
+        if key in flickr_frequent:
+            print(key, sorted_vocab[key])
 
 
 def count_hallucinate_words(predicted_file, gt_file, category_list):
@@ -1415,6 +1496,48 @@ def count_hallucinate_words(predicted_file, gt_file, category_list):
 
 
 
+def ground_truth_work_frequency(dataset):
+
+    assert dataset in {'coco2014', 'flickr8k', 'flickr30k', 'coco2017'}
+    if dataset == 'flickr30k':
+        f_list = flickr_frequent
+        karpathy_json_path = './dataset/dataset_flickr30k.json'
+    elif dataset == 'coco2017':
+        f_list = coco_frequent
+        karpathy_json_path = './dataset/dataset_coco2017.json'
+    else:
+        raise NotImplementedError
+    # Read Karpathy JSON
+    with open(karpathy_json_path, 'r') as j:
+        data = json.load(j)
+
+    # Read image paths and captions for each image
+    train_image_paths = []
+    train_image_captions = []
+    val_image_paths = []
+    val_image_captions = []
+    test_image_paths = []
+    test_image_captions = []
+    word_freq = {}
+
+    for img in data['images']:
+        captions = []
+        for c in img['sentences']:
+            # Update word frequency
+            if img['split'] in ['train', 'restval']:
+                for word in c['tokens']:
+                    if word not in word_freq:
+                        word_freq[word] = 0.
+                    word_freq[word] += 1
+    sorted_vocab = {k: v for k, v in sorted(word_freq.items(), key=lambda item: item[1])}
+    for key in sorted_vocab:
+        if key in f_list:
+            print(key, sorted_vocab[key])
+            f_list.append(key)
+    print(f_list)
+
+
+
 if __name__ == '__main__':
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -1440,7 +1563,7 @@ if __name__ == '__main__':
     # generate_evaluation_files('aoa', explainer_type='Gradient', do_attention=False)
 
     # analyze_ablation('gridTD')
-    # analyze_TPFP_20('gridTD')
+    analyze_TPFP_20('gridTD')
     # analyze_bbox('gridTD')
     # analyze_ablation_aoa()
     # process_multihead_attention_bbox_aoa()
@@ -1448,10 +1571,10 @@ if __name__ == '__main__':
     #
     '''observe the frequent words of the test set'''
     # predicted_file = './output/gridTD_BU_cideropt/vgg16/cocorobust/reference_cocorobust_split_test_beam_search_3.yaml'
-    # predicted_file = './output/gridTD/vgg16/coco2017/reference_coco2017_split_test_beam_search_3.yaml'
-    # predicted_file = './output/gridTD/vgg16/flickr30k/reference_flickr30k_split_test_beam_search_3.yaml'
-    # observe_frequent_words(predicted_file, 100)
-
+    # predicted_file = './output/gridTD_BU_cideropt/vgg16/coco2017/predictions_coco2017_split_test_beam_search_3_epoch13.yaml'
+    # predicted_file = './output/gridTD_BU_cideropt/vgg16/flickr30k/predictions_flickr30k_split_test_beam_search_3_epoch34.yaml'
+    # observe_frequent_words(predicted_file,0)
+    # ground_truth_work_frequency('flickr30k')
 
     '''calculate map'''
 
@@ -1468,16 +1591,16 @@ if __name__ == '__main__':
     #             mpa, mrc, mf1 = count_hallucinate_words(prediction_paths, gt_reference, f_list)
     #             print(f'mpa:\t{mpa}\tmrc:\t{mrc}\tmf1:\t{mf1}')
 
-    for model_type in [ 'aoa_bu', 'gridTD_BU']:
-        for dataset_name in ['coco2017','flickr30k']:
-            gt_reference = glob.glob(f'./output/{model_type}/vgg16/{dataset_name}/reference*')[0]
-            for tune_type in [ 'baselinefinetune','lrpfinetune']:
-                prediction_paths = glob.glob(f'./output/{model_type}_{tune_type}/vgg16/{dataset_name}/predictions_*')[0]
-                if dataset_name == 'coco2017':
-                    f_list = coco_frequent
-                elif dataset_name == 'flickr30k':
-                    f_list = flickr_frequent
-                print(model_type, dataset_name, tune_type)
-                mpa, mrc, mf1 = count_hallucinate_words(prediction_paths, gt_reference, f_list)
-                print(f'mpa:\t{mpa}\tmrc:\t{mrc}\tmf1:\t{mf1}')
+    # for model_type in [ 'aoa_bu', 'gridTD_BU']:
+    #     for dataset_name in ['coco2017','flickr30k']:
+    #         gt_reference = glob.glob(f'./output/{model_type}/vgg16/{dataset_name}/reference*')[0]
+    #         for tune_type in [ 'baselinefinetune','lrpfinetune']:
+    #             prediction_paths = glob.glob(f'./output/{model_type}_{tune_type}/vgg16/{dataset_name}/predictions_*')[0]
+    #             if dataset_name == 'coco2017':
+    #                 f_list = coco_frequent
+    #             elif dataset_name == 'flickr30k':
+    #                 f_list = flickr_frequent
+    #             print(model_type, dataset_name, tune_type)
+    #             mpa, mrc, mf1 = count_hallucinate_words(prediction_paths, gt_reference, f_list)
+    #             print(f'mpa:\t{mpa}\tmrc:\t{mrc}\tmf1:\t{mf1}')
 

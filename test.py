@@ -121,35 +121,35 @@ def validate(val_loader, model, word_map, args, start_epoch, beam_search_type='d
     # write the predictions and ground truth to files
     prediction_filename = f'predictions_{args.dataset}_split_{args.test_split}_{beam_search_type}_{beam_size}_epoch{start_epoch}.yaml'
     gt_filename = f'reference_{args.dataset}_split_{args.test_split}_{beam_search_type}_{beam_size}.yaml'
-    with open(os.path.join(args.save_path, args.encoder, args.dataset, 'lrpfinetune1',prediction_filename), 'w') as f:
+    with open(os.path.join(args.save_path, args.encoder, args.dataset,prediction_filename), 'w') as f:
         yaml.safe_dump(prediction_save, f)
         f.close()
-    with open(os.path.join(args.save_path, args.encoder, args.dataset,'lrpfinetune1',gt_filename), 'w') as f:
+    with open(os.path.join(args.save_path, args.encoder, args.dataset,gt_filename), 'w') as f:
         yaml.safe_dump(gt_save, f)
         f.close()
     metrics_filename =f'metrics_{args.dataset}_split_{args.test_split}_{beam_search_type}_{beam_size}_epoch{start_epoch}.yaml'
     # write the evaluate metrics to files
-    with open(os.path.join(args.save_path, args.encoder, args.dataset, 'lrpfinetune1', metrics_filename), 'w') as f:
+    with open(os.path.join(args.save_path, args.encoder, args.dataset, metrics_filename), 'w') as f:
         yaml.safe_dump(results_dict, f)
         f.close()
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     import glob
     # model_weight_path = './output/adaptive/BEST_checkpoint_flickr30k_epoch49_cider_0.5414486487400703.pth'
     # model_weight_paths = glob.glob('./output/gridTD/vgg16/coco2017/BEST_checkpoint_coco2017_epoch22*')
-    # model_weight_paths = glob.glob('./output/gridTD/vgg16/flickr30k/baselineciderfinetune/checkpoint_flickr30k_epoch28_cider_0.4996554402847656_baseline.pth')
+    model_weight_paths = glob.glob('./output/gridTD/vgg16/flickr30k/BEST_checkpoint_flickr30k_epoch28*')
     # model_weight_paths = glob.glob('./output/aoa/vgg16/flickr30k/BEST_checkpoint_flickr30k_epoch31*')
     # model_weight_paths = glob.glob('./output/aoa/vgg16/coco2017/BEST_checkpoint_coco2017_epoch34*')
-    model_weight_paths = glob.glob('./output/gridTD/vgg16/coco2017/lrpfinetune1/checkpoint*')
+    # model_weight_paths = glob.glob('./output/gridTD/vgg16/coco2017/lrpfinetune1/checkpoint*')
     print(model_weight_paths)
     parser = imgcap_gridTD_argument_parser()
     # parser = imgcap_aoa_argument_parser()
     args = parser.parse_args()
 
-    args.dataset = 'coco2017'
-    # args.dataset = 'flickr30k'
+    # args.dataset = 'coco2017'
+    args.dataset = 'flickr30k'
     for model_weight_path in model_weight_paths:
         args.weight = model_weight_path
         main(beam_search_type='beam_search', args=args)

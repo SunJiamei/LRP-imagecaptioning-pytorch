@@ -83,7 +83,7 @@ class MultiHeadedDotAttention(nn.Module):
             p_attn = dropout(p_attn)
         return torch.matmul(p_attn, value), p_attn  #(bs, num_head, num_query, dk) (bs, num_head, num_query, num_pixel)
 
-    def forward(self, query, value, key):
+    def forward(self, query, key, value):
         if query.dim() == 2:
             single_query = True
             query = query.unsqueeze(1) #(bs, num_query, hiddendim)
@@ -104,6 +104,7 @@ class MultiHeadedDotAttention(nn.Module):
         if single_query:
             x = x.squeeze(1)
             alpha = alpha.squeeze(1)
+        # print(x.shape)
         return x, alpha  #(bs, num_head, num_query, num_pixel)
 
 
@@ -1191,7 +1192,6 @@ class ExplainAOAAttention(object):
         assert len(relevance_preceeding_words) == self.caption_length
         torch.cuda.empty_cache()
         return relevance_preceeding_words
-
 
     def save_linguistic_explanation(self, relevance_preceeding_words):
         img_filename = self.img_filepath.split('/')[-1]
