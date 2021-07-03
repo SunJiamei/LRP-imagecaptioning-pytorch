@@ -1,6 +1,11 @@
 # LRP ImageCaptioning Pytorch
 This is a Pytorch implementation of the latest version of [Understanding Image Captioning Model beyond Visualizing Attention](https://arxiv.org/abs/2001.01037)
 
+![](./examples/imgs/graphabstract.jpg)
+![](./examples/imgs/sport.png)
+![](./examples/imgs/sport_sentence.png)
+
+
 ### What can we do with this repo
 1. To train image captioning models with two kinds of attention mechanisms, adaptive attention, and multi-head attention.
 2. To get both image explanations and linguistic explanations for a predicted word using LRP, Grad-CAM, Guided Grad-CAM, and GuidedBackpropagation.
