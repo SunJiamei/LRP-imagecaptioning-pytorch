@@ -1,9 +1,9 @@
 # LRP ImageCaptioning Pytorch
 This is a Pytorch implementation of the latest version of [Understanding Image Captioning Model beyond Visualizing Attention](https://arxiv.org/abs/2001.01037)
 
-![](./examples/imgs/graphabstract.jpg)
-![](./examples/imgs/sport.png)
-![](./examples/imgs/sport_sentence.png)
+![](./examples/graphabstract.jpg)
+![](./examples/sport.png)
+![](./examples/sport_sentence.png)
 
 
 ### What can we do with this repo
