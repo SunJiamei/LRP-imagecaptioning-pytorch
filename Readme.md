@@ -35,6 +35,10 @@ and multi-head attention with an `FC` layer as the predictor.
 The two models are defined in [gridTDmodel.py](./models/gridTDmodel.py) and [aoamodel.py](./models/aoamodel.py) respectively.
 
 
+### Pre-trained Models
+Our pre-trained models can be downloaded [here](https://drive.google.com/file/d/13PrwflX7mW48Lj7JN51cQ6-ZFBe83bEV/view?usp=sharing).
+Please email to sunjiamei.hit@gmail.com if you could not access them.
+
   
 ### To Evaluate the Image Captioning Model
 We evaluate the image captioning models using BLEU, SPICE, ROUGE, METEOR, and CIDER metrics. We also use [BERT score](https://pypi.org/project/bert-score/). To generate these evaluations,
