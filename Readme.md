@@ -1,10 +1,7 @@
 # LRP ImageCaptioning Pytorch
 This is a Pytorch implementation of the latest version of [Understanding Image Captioning Model beyond Visualizing Attention](https://arxiv.org/abs/2001.01037)
 
-![](./examples/graphabstract.jpg)
-![](./examples/sport.png)
-![](./examples/sport_sentence.png)
-
+<img src= ./examples/graphabstract.jpg width="600">
 
 ### What can we do with this repo
 1. To train image captioning models with two kinds of attention mechanisms, adaptive attention, and multi-head attention.
@@ -77,7 +74,8 @@ This will generate the results of our ablation experiment and *correctness* scor
 we need to download the [COCOvalEntities.json](https://drive.google.com/file/d/1ygSGtJ79FyocW-QshgeuIEQlu24QgF0x/view?usp=sharing) file for calculating the *correctness* scores.
  
 
-
+### More visualizaiton examples
+<img src=./examples/sport.png width="350"> <img src=./examples/sport_sentence.png width="400">
 
 Acknowledgment
 ---------------
